@@ -1,5 +1,6 @@
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
 partial class CameraRenderer
@@ -23,6 +24,14 @@ partial class CameraRenderer
         new ShaderTagId("VertexLM")
     };
     static Material errorMaterial;
+
+    string SampleName { get; set; }
+    partial void PrepareBuffer()
+    {
+        Profiler.BeginSample("Editor Only");
+        buffer.name = SampleName = camera.name;
+        Profiler.EndSample();
+    }
 
     partial void DrawGizmos()
     {
@@ -63,10 +72,7 @@ partial class CameraRenderer
             cullingResults, ref drawingSettings, ref filteringSettings
         );
     }
-
-    partial void PrepareBuffer()
-    { 
-        buffer.name = camera.name;
-    }
+#else
+    const string SampleName = bufferName;
 #endif
 }

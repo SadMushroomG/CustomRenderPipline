@@ -16,7 +16,8 @@ public partial class CameraRenderer
         name = bufferName
     };
 
-    public void Render(ScriptableRenderContext context, Camera camera)
+    public void Render(ScriptableRenderContext context, Camera camera,
+        bool useDynamicBatching, bool useGPUInstancing)
     {
         this.context = context;
         this.camera = camera;
@@ -27,7 +28,7 @@ public partial class CameraRenderer
             return;
         }
         SetUp();
-        DrawVisibleGeometry();
+        DrawVisibleGeometry(useDynamicBatching, useGPUInstancing);
         DrawUnsupportedShaders();
         DrawGizmos();
         Submit();
@@ -36,8 +37,14 @@ public partial class CameraRenderer
     void SetUp()
     {
         context.SetupCameraProperties(camera);
-        buffer.ClearRenderTarget(true, true, Color.clear);
-        buffer.BeginSample(bufferName);
+        CameraClearFlags flags = camera.clearFlags;
+        // <= return false only if flags == nothing
+        buffer.ClearRenderTarget(
+            flags <= CameraClearFlags.Depth, 
+            flags == CameraClearFlags.Color, 
+            flags == CameraClearFlags.Color ?
+            camera.backgroundColor.linear : Color.clear);
+        buffer.BeginSample(SampleName);
         ExecuteBuffer();
         // Setup unity_MatrixVP in shader (view_projection matrix)
         // view matrix: camera's position and orientation, with projection matrix: perspective or orthographic
@@ -45,20 +52,24 @@ public partial class CameraRenderer
 
     void Submit()
     {
-        buffer.EndSample(bufferName);
+        buffer.EndSample(SampleName);
         ExecuteBuffer();
         context.Submit();
     }
 
-    void DrawVisibleGeometry()
+    void DrawVisibleGeometry(bool useDynamicBatching, bool useGPUInstancing)
     {
         // Opaque
         var sortingSettings = new SortingSettings(camera) { 
             criteria = SortingCriteria.CommonOpaque
         };
         var drawingSettings = new DrawingSettings(
-            unlitShaderTagId, sortingSettings 
-        );
+            unlitShaderTagId, sortingSettings
+        )
+        { 
+            enableDynamicBatching = useDynamicBatching,
+            enableInstancing = useGPUInstancing
+        };
         var filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
         context.DrawRenderers(cullingResults, ref drawingSettings, ref filteringSettings);
 
